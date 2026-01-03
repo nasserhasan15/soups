@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seasons of Soups</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs - Correctly imported for Browser Use -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        // Your specific configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyC905qDWIBvB07kWY76zFq_fKr333-SWiQ",
+            authDomain: "soup-seasons.firebaseapp.com",
+            projectId: "soup-seasons",
+            storageBucket: "soup-seasons.firebasestorage.app",
+            messagingSenderId: "741540422220",
+            appId: "1:741540422220:web:d3d299ffb69ce9766acae9",
+            measurementId: "G-TVQN0N3B4W"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Database Constants
+        const RECIPES_COLLECTION = "user_recipes";
+        const DOC_ID = "my_soup_links"; 
+
+        // Listen for real-time updates
+        onSnapshot(doc(db, RECIPES_COLLECTION, DOC_ID), (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                Object.keys(data).forEach(soupName => {
+                    // Find all cards with this soup name
+                    const cards = document.querySelectorAll('.soup-card');
+                    cards.forEach(card => {
+                        // Check if the card title matches the database key
+                        if (card.querySelector('strong').innerText === soupName) {
+                            const link = data[soupName];
+                            if (link) {
+                                card.dataset.link = link;
+                                card.classList.add('has-link');
+                            } else {
+                                delete card.dataset.link;
+                                card.classList.remove('has-link');
+                            }
+                        }
+                    });
+                });
+            }
+        });
+
+        // Make handleSoupClick available globally
+        window.handleSoupClick = async function(element) {
+            const soupName = element.querySelector('strong').innerText;
+            const existingLink = element.dataset.link;
+
+            if (existingLink) {
+                const choice = confirm(`Recipe for ${soupName} saved!\n\nOK: Open Recipe\nCancel: Edit or Delete Link`);
+                if (choice) {
+                    window.open(existingLink, '_blank');
+                    return;
+                }
+            }
+
+            const newUrl = prompt(`Paste your recipe URL for "${soupName}":`, existingLink || "");
+            
+            if (newUrl !== null) {
+                const updates = {};
+                
+                if (newUrl.trim() === "") {
+                    // If empty, delete the link
+                    updates[soupName] = null; // Setting to null or using deleteField() 
+                    // Optimistic update for UI
+                    element.classList.remove('has-link');
+                    delete element.dataset.link;
+                } else {
+                    // Validate URL
+                    try {
+                        // Auto-add https:// if missing
+                        let finalUrl = newUrl.trim();
+                        if (!/^https?:\/\//i.test(finalUrl)) {
+                            finalUrl = 'https://' + finalUrl;
+                        }
+                        new URL(finalUrl); 
+                        updates[soupName] = finalUrl;
+                    } catch (_) {
+                        alert("Please enter a valid URL.");
+                        return;
+                    }
+                }
+                
+                // Save to Firestore
+                try {
+                    await setDoc(doc(db, RECIPES_COLLECTION, DOC_ID), updates, { merge: true });
+                } catch (e) {
+                    console.error("Error saving to database: ", e);
+                    alert("Database Error: Could not save link. Check console for details.");
+                }
+            }
+        };
+    </script>
+
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f9fafb; 
+            color: #1a1a1a; 
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        h1, h2, h3 { font-family: 'Playfair Display', serif; }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 3rem 1.5rem;
+        }
+
+        .soup-card { 
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 6px solid transparent; 
+            cursor: pointer; 
+            position: relative; 
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border-radius: 0.5rem;
+        }
+        
+        .soup-card:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Link Indicator Style */
+        .soup-card.has-link { 
+            border-right: 6px solid #3b82f6; 
+            background-color: #fefffe;
+        }
+        
+        .soup-card.has-link::after {
+            content: 'LINK SAVED';
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            font-size: 0.6rem;
+            font-weight: 800;
+            color: #3b82f6;
+            opacity: 0.5;
+        }
+
+        /* Seasonal Themes */
+        .spring { border-left-color: #4ade80; }
+        .spring:hover { background-color: #f0fdf4; }
+        
+        .summer { border-left-color: #fbbf24; }
+        .summer:hover { background-color: #fffbeb; }
+        
+        .autumn { border-left-color: #f97316; }
+        .autumn:hover { background-color: #fff7ed; }
+        
+        .winter { border-left-color: #3b82f6; }
+        .winter:hover { background-color: #eff6ff; }
+        
+        .line-clamp-1 { 
+            display: -webkit-box; 
+            -webkit-line-clamp: 1; 
+            -webkit-box-orient: vertical; 
+            overflow: hidden; 
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <header class="text-center mb-16 pb-8 border-b border-gray-200">
+            <h1 class="text-5xl md:text-7xl font-bold uppercase tracking-tighter mb-4 italic text-gray-900">Seasons of Soups</h1>
+            <p class="text-gray-500 text-lg font-light tracking-wide">A Curated Archive of Global Gastronomy</p>
+            <div class="mt-4 text-xs font-bold text-blue-600 uppercase tracking-widest bg-blue-50 inline-block px-3 py-1 rounded-full">
+                Connected to Cloud Database
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 gap-16">
+            
+            <!-- TOP ROW: SPRING & SUMMER -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- SPRING -->
+                <section>
+                    <div class="flex items-center mb-6 pb-2 border-b border-green-100">
+                        <span class="text-4xl mr-3">🌱</span>
+                        <div>
+                            <h2 class="text-3xl font-bold text-green-800">Spring</h2>
+                            <span class="text-xs text-green-600 uppercase tracking-wider font-bold">The Green & The Brite</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇳 UN</div>
+                            <strong class="text-lg block mb-1">Minestrone Primavera</strong>
+                            <div class="text-sm text-gray-500 font-light">Light chunky vegetable harvest broth with favas.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇬🇷 GRC</div>
+                            <strong class="text-lg block mb-1">Avgolemono</strong>
+                            <div class="text-sm text-gray-500 font-light">Silky, tangy tempered egg-chicken broth.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇵🇪 PER</div>
+                            <strong class="text-lg block mb-1">Chupe de Camarones</strong>
+                            <div class="text-sm text-gray-500 font-light">Rich milky spot prawn chowder with chili.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇮🇳 IND</div>
+                            <strong class="text-lg block mb-1">Palak Dal</strong>
+                            <div class="text-sm text-gray-500 font-light">Earthy tempered lentil and greens stew.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇫🇷 FRA</div>
+                            <strong class="text-lg block mb-1">Vichyssoise</strong>
+                            <div class="text-sm text-gray-500 font-light">Chilled, velvety potato-leek cream.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇫🇷 FRA</div>
+                            <strong class="text-lg block mb-1">Cream of Asparagus</strong>
+                            <div class="text-sm text-gray-500 font-light">Vibrant green chlorophyll-focused puree.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇲🇪 MNE</div>
+                            <strong class="text-lg block mb-1">Shorbet Adas</strong>
+                            <div class="text-sm text-gray-500 font-light">Smooth, cumin-scented golden lentil puree.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇻🇳 VNM</div>
+                            <strong class="text-lg block mb-1">Beef Pho</strong>
+                            <div class="text-sm text-gray-500 font-light">Aromatic charred ginger and spice infusion.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇯🇵 JPN</div>
+                            <strong class="text-lg block mb-1">Miso Soup</strong>
+                            <div class="text-sm text-gray-500 font-light">Quick umami-rich fermented soybean dashi.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card spring p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇹🇭 THA</div>
+                            <strong class="text-lg block mb-1">Tom Yum</strong>
+                            <div class="text-sm text-gray-500 font-light">Clear lemongrass and kaffir lime infusion.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SUMMER -->
+                <section>
+                    <div class="flex items-center mb-6 pb-2 border-b border-yellow-100">
+                        <span class="text-4xl mr-3">☀️</span>
+                        <div>
+                            <h2 class="text-3xl font-bold text-yellow-600">Summer</h2>
+                            <span class="text-xs text-yellow-600 uppercase tracking-wider font-bold">The Emulsion & The Sun</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇪🇸 ESP</div>
+                            <strong class="text-lg block mb-1">Gazpacho</strong>
+                            <div class="text-sm text-gray-500 font-light">Cold raw vegetable and olive oil emulsion.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇲🇽 MEX</div>
+                            <strong class="text-lg block mb-1">Corn Chowder</strong>
+                            <div class="text-sm text-gray-500 font-light">Starchy, sweet, and smoky summer puree.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇲🇽 MEX</div>
+                            <strong class="text-lg block mb-1">Tortilla Soup</strong>
+                            <div class="text-sm text-gray-500 font-light">Tomato-pasilla broth with textural toppings.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇮🇹 ITA</div>
+                            <strong class="text-lg block mb-1">Pappa al Pomodoro</strong>
+                            <div class="text-sm text-gray-500 font-light">Rustic, thick tomato and bread porridge.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇸 USA</div>
+                            <strong class="text-lg block mb-1">King Salmon Chowder</strong>
+                            <div class="text-sm text-gray-500 font-light">Creamy Pacific seafood and dill stew.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇹🇭 THA</div>
+                            <strong class="text-lg block mb-1">Tom Kha Gai</strong>
+                            <div class="text-sm text-gray-500 font-light">Galangal-infused creamy coconut chicken broth.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇪🇨 ECU</div>
+                            <strong class="text-lg block mb-1">Locro de Papa</strong>
+                            <div class="text-sm text-gray-500 font-light">Andean potato and cheese stew with avocado.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇮🇷 IRN</div>
+                            <strong class="text-lg block mb-1">Ash-e Anar</strong>
+                            <div class="text-sm text-gray-500 font-light">Tart split-pea soup with massive herb volume.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇨🇳 CHN</div>
+                            <strong class="text-lg block mb-1">Hot & Sour Soup</strong>
+                            <div class="text-sm text-gray-500 font-light">Vinegary, peppery cornstarch-thickened classic.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card summer p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇪🇸 ESP</div>
+                            <strong class="text-lg block mb-1">Sopa de Ajo</strong>
+                            <div class="text-sm text-gray-500 font-light">Smoky pimentón and bread soup with egg.</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- BOTTOM ROW: AUTUMN & WINTER -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- AUTUMN -->
+                <section>
+                    <div class="flex items-center mb-6 pb-2 border-b border-orange-100">
+                        <span class="text-4xl mr-3">🍂</span>
+                        <div>
+                            <h2 class="text-3xl font-bold text-orange-600">Autumn</h2>
+                            <span class="text-xs text-orange-600 uppercase tracking-wider font-bold">The Harvest & The Earth</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇭🇹 HTI</div>
+                            <strong class="text-lg block mb-1">Soupe Joumou</strong>
+                            <div class="text-sm text-gray-500 font-light">Hearty, celebratory squash and beef stew.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇸🇳 SEN</div>
+                            <strong class="text-lg block mb-1">Maafe</strong>
+                            <div class="text-sm text-gray-500 font-light">Creamy, nutty West African groundnut reduction.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇭🇺 HUN</div>
+                            <strong class="text-lg block mb-1">Hungarian Goulash</strong>
+                            <div class="text-sm text-gray-500 font-light">Slow-braised beef and sweet pepper reduction.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇮🇳 IND</div>
+                            <strong class="text-lg block mb-1">Mulligatawny</strong>
+                            <div class="text-sm text-gray-500 font-light">Curried lentil soup with sweet-tart contrast.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇲🇦 MAR</div>
+                            <strong class="text-lg block mb-1">Harira</strong>
+                            <div class="text-sm text-gray-500 font-light">Zesty tomato, lentil, and chickpea fast-breaker.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇨🇴 COL</div>
+                            <strong class="text-lg block mb-1">Ajiaco</strong>
+                            <div class="text-sm text-gray-500 font-light">Colombian chicken stew thickened by potato starch.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇸 USA</div>
+                            <strong class="text-lg block mb-1">Texas Chili</strong>
+                            <div class="text-sm text-gray-500 font-light">High-viscosity concentrated chili paste braise.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇳🇬 NGA</div>
+                            <strong class="text-lg block mb-1">Banga</strong>
+                            <div class="text-sm text-gray-500 font-light">Dense, earthy palm nut oil and seafood soup.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇨🇳 CHN</div>
+                            <strong class="text-lg block mb-1">Hulatang</strong>
+                            <div class="text-sm text-gray-500 font-light">Henan breakfast soup with wheat gluten.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card autumn p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇸 USA</div>
+                            <strong class="text-lg block mb-1">Butternut Squash</strong>
+                            <div class="text-sm text-gray-500 font-light">Roasted squash puree with autumn spices.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- WINTER -->
+                <section>
+                    <div class="flex items-center mb-6 pb-2 border-b border-blue-100">
+                        <span class="text-4xl mr-3">❄️</span>
+                        <div>
+                            <h2 class="text-3xl font-bold text-blue-700">Winter</h2>
+                            <span class="text-xs text-blue-600 uppercase tracking-wider font-bold">The Umami & The Hearth</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇸 USA</div>
+                            <strong class="text-lg block mb-1">Cioppino</strong>
+                            <div class="text-sm text-gray-500 font-light">Classic SF tomato-wine seafood reduction.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇮🇹 ITA</div>
+                            <strong class="text-lg block mb-1">Ribollita</strong>
+                            <div class="text-sm text-gray-500 font-light">"Re-boiled" Tuscan bean, green, and bread stew.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇫🇷 FRA</div>
+                            <strong class="text-lg block mb-1">French Onion</strong>
+                            <div class="text-sm text-gray-500 font-light">Caramelized onion test of Maillard mastery.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇩🇪 DEU</div>
+                            <strong class="text-lg block mb-1">Kartoffelsuppe</strong>
+                            <div class="text-sm text-gray-500 font-light">Hearty German potato and sausage puree.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇻🇳 VNM</div>
+                            <strong class="text-lg block mb-1">Bun Rieu</strong>
+                            <div class="text-sm text-gray-500 font-light">Tangy seafood noodle soup with egg clouds.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🏴󠁧󠁢󠁳󠁣󠁴󠁿 GBR</div>
+                            <strong class="text-lg block mb-1">Cullen Skink</strong>
+                            <div class="text-sm text-gray-500 font-light">Potent Scottish smoked fish and potato cream.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇦 UKR</div>
+                            <strong class="text-lg block mb-1">Borscht</strong>
+                            <div class="text-sm text-gray-500 font-light">Earthy, vibrant fermented beet and vegetable broth.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇺🇸 USA</div>
+                            <strong class="text-lg block mb-1">Gumbo</strong>
+                            <div class="text-sm text-gray-500 font-light">Complex Creole thickener masterclass.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇰🇷 KOR</div>
+                            <strong class="text-lg block mb-1">Sundubu-jjigae</strong>
+                            <div class="text-sm text-gray-500 font-light">Fiery, anchovy-based soft tofu earthenware stew.</div>
+                        </div>
+                        <div onclick="handleSoupClick(this)" class="soup-card winter p-4">
+                            <div class="text-xs font-bold text-gray-400 mb-1">🇨🇳 CHN</div>
+                            <strong class="text-lg block mb-1">Malatang</strong>
+                            <div class="text-sm text-gray-500 font-light">Sichuan street-style customizable chili broth.</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <footer class="mt-20 pt-8 border-t border-gray-200 text-center text-sm text-gray-400 tracking-widest uppercase">
+            MasterChef Nass In Da House
+        </footer>
+    </div>
+
+</body>
+</html>
